@@ -73,6 +73,7 @@ const READ_METHODS = new Set([
   "node.describe",
   "chat.history",
   "config.get",
+  "talk.config",
 ]);
 const WRITE_METHODS = new Set([
   "send",
