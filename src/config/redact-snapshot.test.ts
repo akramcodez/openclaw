@@ -179,6 +179,29 @@ describe("redactConfigSnapshot", () => {
     expect(gw.auth.token).toBe(REDACTED_SENTINEL);
   });
 
+  it("does not redact passwordFile path fields", () => {
+    const snapshot = makeSnapshot({
+      channels: {
+        irc: {
+          passwordFile: "/etc/openclaw/irc-password.txt",
+          nickserv: {
+            passwordFile: "/etc/openclaw/nickserv-password.txt",
+            password: "super-secret-nickserv-password",
+          },
+        },
+      },
+    });
+
+    const result = redactConfigSnapshot(snapshot);
+    const channels = result.config.channels as Record<string, Record<string, unknown>>;
+    const irc = channels.irc;
+    const nickserv = irc.nickserv as Record<string, unknown>;
+
+    expect(irc.passwordFile).toBe("/etc/openclaw/irc-password.txt");
+    expect(nickserv.passwordFile).toBe("/etc/openclaw/nickserv-password.txt");
+    expect(nickserv.password).toBe(REDACTED_SENTINEL);
+  });
+
   it("preserves hash unchanged", () => {
     const snapshot = makeSnapshot({ gateway: { auth: { token: "secret-token-value-here" } } });
     const result = redactConfigSnapshot(snapshot);
