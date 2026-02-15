@@ -1,10 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { __test__ } from "./schema.hints.js";
+import { __test__, isSensitiveConfigPath } from "./schema.hints.js";
 import { OpenClawSchema } from "./zod-schema.js";
 import { sensitive } from "./zod-schema.sensitive.js";
 
 const { mapSensitivePaths } = __test__;
+
+describe("isSensitiveConfigPath", () => {
+  it("matches whitelist suffixes case-insensitively", () => {
+    expect(isSensitiveConfigPath("maxTokens")).toBe(false);
+    expect(isSensitiveConfigPath("MAXTOKENS")).toBe(false);
+    expect(isSensitiveConfigPath("channels.irc.nickserv.passwordFile")).toBe(false);
+    expect(isSensitiveConfigPath("channels.irc.nickserv.PASSWORDFILE")).toBe(false);
+  });
+
+  it("keeps true sensitive keys redacted", () => {
+    expect(isSensitiveConfigPath("channels.slack.token")).toBe(true);
+    expect(isSensitiveConfigPath("models.providers.openai.apiKey")).toBe(true);
+    expect(isSensitiveConfigPath("channels.irc.nickserv.password")).toBe(true);
+  });
+});
 
 describe("mapSensitivePaths", () => {
   it("should detect sensitive fields nested inside all structural Zod types", () => {
