@@ -366,7 +366,9 @@ describe("redactConfigSnapshot", () => {
     });
     const result = redactConfigSnapshot(snapshot, hints);
     const custom = result.config.custom as Record<string, string>;
+    const resolved = result.resolved as Record<string, Record<string, string>>;
     expect(custom.mySecret).toBe(REDACTED_SENTINEL);
+    expect(resolved.custom.mySecret).toBe(REDACTED_SENTINEL);
   });
 
   it("keeps regex fallback for extension keys not covered by uiHints", () => {
@@ -653,7 +655,9 @@ describe("redactConfigSnapshot", () => {
     });
     const result = redactConfigSnapshot(snapshot, hints);
     const gw = result.config.gateway as Record<string, Record<string, string>>;
+    const resolved = result.resolved as Record<string, Record<string, Record<string, string>>>;
     expect(gw.auth.token).toBe("not-actually-secret-value");
+    expect(resolved.gateway.auth.token).toBe("not-actually-secret-value");
   });
 
   it("does not redact paths absent from uiHints (schema is single source of truth)", () => {
@@ -665,7 +669,9 @@ describe("redactConfigSnapshot", () => {
     });
     const result = redactConfigSnapshot(snapshot, hints);
     const gw = result.config.gateway as Record<string, Record<string, string>>;
+    const resolved = result.resolved as Record<string, Record<string, Record<string, string>>>;
     expect(gw.auth.password).toBe("not-in-hints-value");
+    expect(resolved.gateway.auth.password).toBe("not-in-hints-value");
   });
 
   it("uses wildcard hints for array items", () => {
