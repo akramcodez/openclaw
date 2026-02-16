@@ -5,9 +5,22 @@ import { isPlainObject } from "../utils.js";
 
 const log = createSubsystemLogger("agents/loop-detection");
 
+export type LoopDetectorKind =
+  | "generic_repeat"
+  | "known_poll_no_progress"
+  | "global_circuit_breaker"
+  | "ping_pong";
+
 export type LoopDetectionResult =
   | { stuck: false }
-  | { stuck: true; level: "warning" | "critical"; message: string };
+  | {
+      stuck: true;
+      level: "warning" | "critical";
+      detector: LoopDetectorKind;
+      count: number;
+      message: string;
+      pairedToolName?: string;
+    };
 
 export const TOOL_CALL_HISTORY_SIZE = 30;
 export const WARNING_THRESHOLD = 10;
@@ -174,6 +187,61 @@ function getNoProgressStreak(
   return streak;
 }
 
+function getPingPongStreak(
+  history: Array<{ toolName: string; argsHash: string }>,
+  currentSignature: string,
+): { count: number; pairedToolName?: string } {
+  const last = history.at(-1);
+  if (!last) {
+    return { count: 0 };
+  }
+
+  let otherSignature: string | undefined;
+  let otherToolName: string | undefined;
+  for (let i = history.length - 2; i >= 0; i -= 1) {
+    const call = history[i];
+    if (!call) {
+      continue;
+    }
+    if (call.argsHash !== last.argsHash) {
+      otherSignature = call.argsHash;
+      otherToolName = call.toolName;
+      break;
+    }
+  }
+
+  if (!otherSignature || !otherToolName) {
+    return { count: 0 };
+  }
+
+  let alternatingTailCount = 0;
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const call = history[i];
+    if (!call) {
+      continue;
+    }
+    const expected = alternatingTailCount % 2 === 0 ? last.argsHash : otherSignature;
+    if (call.argsHash !== expected) {
+      break;
+    }
+    alternatingTailCount += 1;
+  }
+
+  if (alternatingTailCount < 2) {
+    return { count: 0 };
+  }
+
+  const expectedCurrentSignature = otherSignature;
+  if (currentSignature !== expectedCurrentSignature) {
+    return { count: 0 };
+  }
+
+  return {
+    count: alternatingTailCount + 1,
+    pairedToolName: last.toolName,
+  };
+}
+
 /**
  * Detect if an agent is stuck in a repetitive tool call loop.
  * Checks if the same tool+params combination has been called excessively.
@@ -187,6 +255,7 @@ export function detectToolCallLoop(
   const currentHash = hashToolCall(toolName, params);
   const noProgressStreak = getNoProgressStreak(history, toolName, currentHash);
   const knownPollTool = isKnownPollToolCall(toolName, params);
+  const pingPong = getPingPongStreak(history, currentHash);
 
   if (noProgressStreak >= GLOBAL_CIRCUIT_BREAKER_THRESHOLD) {
     log.error(
@@ -195,6 +264,8 @@ export function detectToolCallLoop(
     return {
       stuck: true,
       level: "critical",
+      detector: "global_circuit_breaker",
+      count: noProgressStreak,
       message: `CRITICAL: ${toolName} has repeated identical no-progress outcomes ${noProgressStreak} times. Session execution blocked by global circuit breaker to prevent runaway loops.`,
     };
   }
@@ -204,6 +275,8 @@ export function detectToolCallLoop(
     return {
       stuck: true,
       level: "critical",
+      detector: "known_poll_no_progress",
+      count: noProgressStreak,
       message: `CRITICAL: Called ${toolName} with identical arguments and no progress ${noProgressStreak} times. This appears to be a stuck polling loop. Session execution blocked to prevent resource waste.`,
     };
   }
@@ -213,7 +286,23 @@ export function detectToolCallLoop(
     return {
       stuck: true,
       level: "warning",
+      detector: "known_poll_no_progress",
+      count: noProgressStreak,
       message: `WARNING: You have called ${toolName} ${noProgressStreak} times with identical arguments and no progress. Stop polling and either (1) increase wait time between checks, or (2) report the task as failed if the process is stuck.`,
+    };
+  }
+
+  if (pingPong.count >= WARNING_THRESHOLD) {
+    log.warn(
+      `Ping-pong loop warning: alternating calls count=${pingPong.count} currentTool=${toolName}`,
+    );
+    return {
+      stuck: true,
+      level: "warning",
+      detector: "ping_pong",
+      count: pingPong.count,
+      message: `WARNING: You are alternating between repeated tool-call patterns (${pingPong.count} consecutive calls). This looks like a ping-pong loop; stop retrying and report the task as failed.`,
+      pairedToolName: pingPong.pairedToolName,
     };
   }
 
@@ -227,6 +316,8 @@ export function detectToolCallLoop(
     return {
       stuck: true,
       level: "warning",
+      detector: "generic_repeat",
+      count: recentCount,
       message: `WARNING: You have called ${toolName} ${recentCount} times with identical arguments. If this is not making progress, stop retrying and report the task as failed.`,
     };
   }

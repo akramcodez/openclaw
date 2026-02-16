@@ -136,6 +136,8 @@ describe("tool-loop-detection", () => {
       expect(result.stuck).toBe(true);
       if (result.stuck) {
         expect(result.level).toBe("warning");
+        expect(result.detector).toBe("generic_repeat");
+        expect(result.count).toBe(WARNING_THRESHOLD);
         expect(result.message).toContain("WARNING");
         expect(result.message).toContain(`${WARNING_THRESHOLD} times`);
       }
@@ -176,6 +178,7 @@ describe("tool-loop-detection", () => {
       expect(loopResult.stuck).toBe(true);
       if (loopResult.stuck) {
         expect(loopResult.level).toBe("warning");
+        expect(loopResult.detector).toBe("known_poll_no_progress");
         expect(loopResult.message).toContain("no progress");
       }
     });
@@ -196,6 +199,7 @@ describe("tool-loop-detection", () => {
       expect(loopResult.stuck).toBe(true);
       if (loopResult.stuck) {
         expect(loopResult.level).toBe("critical");
+        expect(loopResult.detector).toBe("known_poll_no_progress");
         expect(loopResult.message).toContain("CRITICAL");
       }
     });
@@ -232,8 +236,43 @@ describe("tool-loop-detection", () => {
       expect(loopResult.stuck).toBe(true);
       if (loopResult.stuck) {
         expect(loopResult.level).toBe("critical");
+        expect(loopResult.detector).toBe("global_circuit_breaker");
         expect(loopResult.message).toContain("global circuit breaker");
       }
+    });
+
+    it("warns on ping-pong alternating patterns", () => {
+      const state = createState();
+      const readParams = { path: "/a.txt" };
+      const listParams = { dir: "/workspace" };
+
+      for (let i = 0; i < WARNING_THRESHOLD - 1; i += 1) {
+        if (i % 2 === 0) {
+          recordToolCall(state, "read", readParams, `read-${i}`);
+        } else {
+          recordToolCall(state, "list", listParams, `list-${i}`);
+        }
+      }
+
+      const loopResult = detectToolCallLoop(state, "list", listParams);
+      expect(loopResult.stuck).toBe(true);
+      if (loopResult.stuck) {
+        expect(loopResult.level).toBe("warning");
+        expect(loopResult.detector).toBe("ping_pong");
+        expect(loopResult.count).toBe(WARNING_THRESHOLD);
+        expect(loopResult.message).toContain("ping-pong loop");
+      }
+    });
+
+    it("does not flag ping-pong when alternation is broken", () => {
+      const state = createState();
+      recordToolCall(state, "read", { path: "/a.txt" }, "a1");
+      recordToolCall(state, "list", { dir: "/workspace" }, "b1");
+      recordToolCall(state, "read", { path: "/a.txt" }, "a2");
+      recordToolCall(state, "write", { path: "/tmp/out.txt" }, "c1"); // breaks alternation
+
+      const loopResult = detectToolCallLoop(state, "list", { dir: "/workspace" });
+      expect(loopResult.stuck).toBe(false);
     });
 
     it("records fixed-size result hashes for large tool outputs", () => {

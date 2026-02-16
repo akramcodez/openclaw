@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AnyAgentTool } from "./tools/common.js";
+import {
+  onDiagnosticEvent,
+  resetDiagnosticEventsForTest,
+  type DiagnosticToolLoopEvent,
+} from "../infra/diagnostic-events.js";
 import { resetDiagnosticSessionStateForTest } from "../logging/diagnostic-session-state.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import { wrapToolWithBeforeToolCallHook } from "./pi-tools.before-tool-call.js";
@@ -16,6 +22,7 @@ describe("before_tool_call loop detection behavior", () => {
 
   beforeEach(() => {
     resetDiagnosticSessionStateForTest();
+    resetDiagnosticEventsForTest();
     hookRunner = {
       hasHooks: vi.fn(),
       runBeforeToolCall: vi.fn(),
@@ -103,5 +110,97 @@ describe("before_tool_call loop detection behavior", () => {
     await expect(
       tool.execute(`read-${GLOBAL_CIRCUIT_BREAKER_THRESHOLD}`, params, undefined, undefined),
     ).rejects.toThrow("global circuit breaker");
+  });
+
+  it("emits structured warning diagnostic events for ping-pong loops", async () => {
+    const emitted: DiagnosticToolLoopEvent[] = [];
+    const stop = onDiagnosticEvent((evt) => {
+      if (evt.type === "tool.loop") {
+        emitted.push(evt);
+      }
+    });
+    try {
+      const readExecute = vi.fn().mockResolvedValue({
+        content: [{ type: "text", text: "read ok" }],
+        details: { ok: true },
+      });
+      const listExecute = vi.fn().mockResolvedValue({
+        content: [{ type: "text", text: "list ok" }],
+        details: { ok: true },
+      });
+      const readTool = wrapToolWithBeforeToolCallHook(
+        { name: "read", execute: readExecute } as unknown as AnyAgentTool,
+        {
+          agentId: "main",
+          sessionKey: "main",
+        },
+      );
+      const listTool = wrapToolWithBeforeToolCallHook(
+        { name: "list", execute: listExecute } as unknown as AnyAgentTool,
+        {
+          agentId: "main",
+          sessionKey: "main",
+        },
+      );
+
+      for (let i = 0; i < 9; i += 1) {
+        if (i % 2 === 0) {
+          await readTool.execute(`read-${i}`, { path: "/a.txt" }, undefined, undefined);
+        } else {
+          await listTool.execute(`list-${i}`, { dir: "/workspace" }, undefined, undefined);
+        }
+      }
+
+      await listTool.execute("list-9", { dir: "/workspace" }, undefined, undefined);
+
+      const loopEvent = emitted.at(-1);
+      expect(loopEvent?.type).toBe("tool.loop");
+      expect(loopEvent?.level).toBe("warning");
+      expect(loopEvent?.action).toBe("warn");
+      expect(loopEvent?.detector).toBe("ping_pong");
+      expect(loopEvent?.count).toBe(10);
+      expect(loopEvent?.toolName).toBe("list");
+    } finally {
+      stop();
+    }
+  });
+
+  it("emits structured critical diagnostic events when blocking loops", async () => {
+    const emitted: DiagnosticToolLoopEvent[] = [];
+    const stop = onDiagnosticEvent((evt) => {
+      if (evt.type === "tool.loop") {
+        emitted.push(evt);
+      }
+    });
+    try {
+      const execute = vi.fn().mockResolvedValue({
+        content: [{ type: "text", text: "(no new output)\n\nProcess still running." }],
+        details: { status: "running", aggregated: "steady" },
+      });
+      // oxlint-disable-next-line typescript/no-explicit-any
+      const tool = wrapToolWithBeforeToolCallHook({ name: "process", execute } as any, {
+        agentId: "main",
+        sessionKey: "main",
+      });
+      const params = { action: "poll", sessionId: "sess-crit" };
+
+      for (let i = 0; i < CRITICAL_THRESHOLD; i += 1) {
+        await tool.execute(`poll-${i}`, params, undefined, undefined);
+      }
+
+      await expect(
+        tool.execute(`poll-${CRITICAL_THRESHOLD}`, params, undefined, undefined),
+      ).rejects.toThrow("CRITICAL");
+
+      const loopEvent = emitted.at(-1);
+      expect(loopEvent?.type).toBe("tool.loop");
+      expect(loopEvent?.level).toBe("critical");
+      expect(loopEvent?.action).toBe("block");
+      expect(loopEvent?.detector).toBe("known_poll_no_progress");
+      expect(loopEvent?.count).toBe(CRITICAL_THRESHOLD);
+      expect(loopEvent?.toolName).toBe("process");
+    } finally {
+      stop();
+    }
   });
 });

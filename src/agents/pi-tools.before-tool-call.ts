@@ -57,6 +57,7 @@ export async function runBeforeToolCallHook(args: {
 
   if (args.ctx?.sessionKey) {
     const { getDiagnosticSessionState } = await import("../logging/diagnostic-session-state.js");
+    const { logToolLoopAction } = await import("../logging/diagnostic.js");
     const { detectToolCallLoop, recordToolCall } = await import("./tool-loop-detection.js");
 
     const sessionState = getDiagnosticSessionState({
@@ -69,12 +70,34 @@ export async function runBeforeToolCallHook(args: {
     if (loopResult.stuck) {
       if (loopResult.level === "critical") {
         log.error(`Blocking ${toolName} due to critical loop: ${loopResult.message}`);
+        logToolLoopAction({
+          sessionKey: args.ctx.sessionKey,
+          sessionId: args.ctx?.agentId,
+          toolName,
+          level: "critical",
+          action: "block",
+          detector: loopResult.detector,
+          count: loopResult.count,
+          message: loopResult.message,
+          pairedToolName: loopResult.pairedToolName,
+        });
         return {
           blocked: true,
           reason: loopResult.message,
         };
       } else {
         log.warn(`Loop warning for ${toolName}: ${loopResult.message}`);
+        logToolLoopAction({
+          sessionKey: args.ctx.sessionKey,
+          sessionId: args.ctx?.agentId,
+          toolName,
+          level: "warning",
+          action: "warn",
+          detector: loopResult.detector,
+          count: loopResult.count,
+          message: loopResult.message,
+          pairedToolName: loopResult.pairedToolName,
+        });
       }
     }
 
