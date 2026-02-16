@@ -182,8 +182,14 @@ describe("before_tool_call loop detection behavior", () => {
       }
 
       await listTool.execute("list-9", { dir: "/workspace" }, undefined, undefined);
+      await readTool.execute("read-10", { path: "/a.txt" }, undefined, undefined);
+      await listTool.execute("list-11", { dir: "/workspace" }, undefined, undefined);
 
-      const loopEvent = emitted.at(-1);
+      const pingPongWarns = emitted.filter(
+        (evt) => evt.level === "warning" && evt.detector === "ping_pong",
+      );
+      expect(pingPongWarns).toHaveLength(1);
+      const loopEvent = pingPongWarns[0];
       expect(loopEvent?.type).toBe("tool.loop");
       expect(loopEvent?.level).toBe("warning");
       expect(loopEvent?.action).toBe("warn");
@@ -250,6 +256,67 @@ describe("before_tool_call loop detection behavior", () => {
       expect(loopEvent?.detector).toBe("ping_pong");
       expect(loopEvent?.count).toBe(CRITICAL_THRESHOLD);
       expect(loopEvent?.toolName).toBe("list");
+    } finally {
+      stop();
+    }
+  });
+
+  it("does not block ping-pong at critical threshold when outcomes are progressing", async () => {
+    const emitted: DiagnosticToolLoopEvent[] = [];
+    const stop = onDiagnosticEvent((evt) => {
+      if (evt.type === "tool.loop") {
+        emitted.push(evt);
+      }
+    });
+    try {
+      const readExecute = vi.fn().mockImplementation(async (toolCallId: string) => ({
+        content: [{ type: "text", text: `read ${toolCallId}` }],
+        details: { ok: true },
+      }));
+      const listExecute = vi.fn().mockImplementation(async (toolCallId: string) => ({
+        content: [{ type: "text", text: `list ${toolCallId}` }],
+        details: { ok: true },
+      }));
+      const readTool = wrapToolWithBeforeToolCallHook(
+        { name: "read", execute: readExecute } as unknown as AnyAgentTool,
+        {
+          agentId: "main",
+          sessionKey: "main",
+        },
+      );
+      const listTool = wrapToolWithBeforeToolCallHook(
+        { name: "list", execute: listExecute } as unknown as AnyAgentTool,
+        {
+          agentId: "main",
+          sessionKey: "main",
+        },
+      );
+
+      for (let i = 0; i < CRITICAL_THRESHOLD - 1; i += 1) {
+        if (i % 2 === 0) {
+          await readTool.execute(`read-${i}`, { path: "/a.txt" }, undefined, undefined);
+        } else {
+          await listTool.execute(`list-${i}`, { dir: "/workspace" }, undefined, undefined);
+        }
+      }
+
+      await expect(
+        listTool.execute(
+          `list-${CRITICAL_THRESHOLD - 1}`,
+          { dir: "/workspace" },
+          undefined,
+          undefined,
+        ),
+      ).resolves.toBeDefined();
+
+      const criticalPingPong = emitted.find(
+        (evt) => evt.level === "critical" && evt.detector === "ping_pong",
+      );
+      expect(criticalPingPong).toBeUndefined();
+      const warningPingPong = emitted.find(
+        (evt) => evt.level === "warning" && evt.detector === "ping_pong",
+      );
+      expect(warningPingPong).toBeTruthy();
     } finally {
       stop();
     }

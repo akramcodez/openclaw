@@ -271,9 +271,21 @@ describe("tool-loop-detection", () => {
 
       for (let i = 0; i < CRITICAL_THRESHOLD - 1; i += 1) {
         if (i % 2 === 0) {
-          recordToolCall(state, "read", readParams, `read-${i}`);
+          recordSuccessfulCall(
+            state,
+            "read",
+            readParams,
+            { content: [{ type: "text", text: "read stable" }], details: { ok: true } },
+            i,
+          );
         } else {
-          recordToolCall(state, "list", listParams, `list-${i}`);
+          recordSuccessfulCall(
+            state,
+            "list",
+            listParams,
+            { content: [{ type: "text", text: "list stable" }], details: { ok: true } },
+            i,
+          );
         }
       }
 
@@ -285,6 +297,40 @@ describe("tool-loop-detection", () => {
         expect(loopResult.count).toBe(CRITICAL_THRESHOLD);
         expect(loopResult.message).toContain("CRITICAL");
         expect(loopResult.message).toContain("ping-pong loop");
+      }
+    });
+
+    it("does not block ping-pong at critical threshold when outcomes are progressing", () => {
+      const state = createState();
+      const readParams = { path: "/a.txt" };
+      const listParams = { dir: "/workspace" };
+
+      for (let i = 0; i < CRITICAL_THRESHOLD - 1; i += 1) {
+        if (i % 2 === 0) {
+          recordSuccessfulCall(
+            state,
+            "read",
+            readParams,
+            { content: [{ type: "text", text: `read ${i}` }], details: { ok: true } },
+            i,
+          );
+        } else {
+          recordSuccessfulCall(
+            state,
+            "list",
+            listParams,
+            { content: [{ type: "text", text: `list ${i}` }], details: { ok: true } },
+            i,
+          );
+        }
+      }
+
+      const loopResult = detectToolCallLoop(state, "list", listParams);
+      expect(loopResult.stuck).toBe(true);
+      if (loopResult.stuck) {
+        expect(loopResult.level).toBe("warning");
+        expect(loopResult.detector).toBe("ping_pong");
+        expect(loopResult.count).toBe(CRITICAL_THRESHOLD);
       }
     });
 

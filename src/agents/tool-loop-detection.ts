@@ -189,12 +189,17 @@ function getNoProgressStreak(
 }
 
 function getPingPongStreak(
-  history: Array<{ toolName: string; argsHash: string }>,
+  history: Array<{ toolName: string; argsHash: string; resultHash?: string }>,
   currentSignature: string,
-): { count: number; pairedToolName?: string } {
+): {
+  count: number;
+  pairedToolName?: string;
+  pairedSignature?: string;
+  noProgressEvidence: boolean;
+} {
   const last = history.at(-1);
   if (!last) {
-    return { count: 0 };
+    return { count: 0, noProgressEvidence: false };
   }
 
   let otherSignature: string | undefined;
@@ -212,7 +217,7 @@ function getPingPongStreak(
   }
 
   if (!otherSignature || !otherToolName) {
-    return { count: 0 };
+    return { count: 0, noProgressEvidence: false };
   }
 
   let alternatingTailCount = 0;
@@ -229,18 +234,64 @@ function getPingPongStreak(
   }
 
   if (alternatingTailCount < 2) {
-    return { count: 0 };
+    return { count: 0, noProgressEvidence: false };
   }
 
   const expectedCurrentSignature = otherSignature;
   if (currentSignature !== expectedCurrentSignature) {
-    return { count: 0 };
+    return { count: 0, noProgressEvidence: false };
+  }
+
+  const tailStart = Math.max(0, history.length - alternatingTailCount);
+  let firstHashA: string | undefined;
+  let firstHashB: string | undefined;
+  let noProgressEvidence = true;
+  for (let i = tailStart; i < history.length; i += 1) {
+    const call = history[i];
+    if (!call) {
+      continue;
+    }
+    if (!call.resultHash) {
+      noProgressEvidence = false;
+      break;
+    }
+    if (call.argsHash === last.argsHash) {
+      if (!firstHashA) {
+        firstHashA = call.resultHash;
+      } else if (firstHashA !== call.resultHash) {
+        noProgressEvidence = false;
+        break;
+      }
+      continue;
+    }
+    if (call.argsHash === otherSignature) {
+      if (!firstHashB) {
+        firstHashB = call.resultHash;
+      } else if (firstHashB !== call.resultHash) {
+        noProgressEvidence = false;
+        break;
+      }
+      continue;
+    }
+    noProgressEvidence = false;
+    break;
+  }
+
+  // Need repeated stable outcomes on both sides before treating ping-pong as no-progress.
+  if (!firstHashA || !firstHashB) {
+    noProgressEvidence = false;
   }
 
   return {
     count: alternatingTailCount + 1,
     pairedToolName: last.toolName,
+    pairedSignature: last.argsHash,
+    noProgressEvidence,
   };
+}
+
+function canonicalPairKey(signatureA: string, signatureB: string): string {
+  return [signatureA, signatureB].toSorted().join("|");
 }
 
 /**
@@ -297,7 +348,11 @@ export function detectToolCallLoop(
     };
   }
 
-  if (pingPong.count >= CRITICAL_THRESHOLD) {
+  const pingPongWarningKey = pingPong.pairedSignature
+    ? `pingpong:${canonicalPairKey(currentHash, pingPong.pairedSignature)}`
+    : `pingpong:${toolName}:${currentHash}`;
+
+  if (pingPong.count >= CRITICAL_THRESHOLD && pingPong.noProgressEvidence) {
     log.error(
       `Critical ping-pong loop detected: alternating calls count=${pingPong.count} currentTool=${toolName}`,
     );
@@ -306,9 +361,9 @@ export function detectToolCallLoop(
       level: "critical",
       detector: "ping_pong",
       count: pingPong.count,
-      message: `CRITICAL: You are alternating between repeated tool-call patterns (${pingPong.count} consecutive calls). This appears to be a stuck ping-pong loop. Session execution blocked to prevent resource waste.`,
+      message: `CRITICAL: You are alternating between repeated tool-call patterns (${pingPong.count} consecutive calls) with no progress. This appears to be a stuck ping-pong loop. Session execution blocked to prevent resource waste.`,
       pairedToolName: pingPong.pairedToolName,
-      warningKey: `pingpong:${toolName}:${currentHash}:${pingPong.pairedToolName ?? "unknown"}`,
+      warningKey: pingPongWarningKey,
     };
   }
 
@@ -323,7 +378,7 @@ export function detectToolCallLoop(
       count: pingPong.count,
       message: `WARNING: You are alternating between repeated tool-call patterns (${pingPong.count} consecutive calls). This looks like a ping-pong loop; stop retrying and report the task as failed.`,
       pairedToolName: pingPong.pairedToolName,
-      warningKey: `pingpong:${toolName}:${currentHash}:${pingPong.pairedToolName ?? "unknown"}`,
+      warningKey: pingPongWarningKey,
     };
   }
 
