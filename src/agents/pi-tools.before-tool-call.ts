@@ -48,7 +48,7 @@ export async function runBeforeToolCallHook(args: {
       }
     }
 
-    recordToolCall(sessionState, toolName, params);
+    recordToolCall(sessionState, toolName, params, args.toolCallId);
   }
 
   const hookRunner = getGlobalHookRunner();
@@ -121,7 +121,55 @@ export function wrapToolWithBeforeToolCallHook(
           }
         }
       }
-      return await execute(toolCallId, outcome.params, signal, onUpdate);
+      const normalizedToolName = normalizeToolName(toolName || "tool");
+      try {
+        const result = await execute(toolCallId, outcome.params, signal, onUpdate);
+        if (ctx?.sessionKey) {
+          try {
+            const { getDiagnosticSessionState } =
+              await import("../logging/diagnostic-session-state.js");
+            const { recordToolCallOutcome } = await import("./tool-loop-detection.js");
+            const sessionState = getDiagnosticSessionState({
+              sessionKey: ctx.sessionKey,
+              sessionId: ctx?.agentId,
+            });
+            recordToolCallOutcome(sessionState, {
+              toolName: normalizedToolName,
+              toolParams: outcome.params,
+              toolCallId,
+              result,
+            });
+          } catch (err) {
+            log.warn(
+              `tool loop outcome tracking failed: tool=${normalizedToolName} error=${String(err)}`,
+            );
+          }
+        }
+        return result;
+      } catch (err) {
+        if (ctx?.sessionKey) {
+          try {
+            const { getDiagnosticSessionState } =
+              await import("../logging/diagnostic-session-state.js");
+            const { recordToolCallOutcome } = await import("./tool-loop-detection.js");
+            const sessionState = getDiagnosticSessionState({
+              sessionKey: ctx.sessionKey,
+              sessionId: ctx?.agentId,
+            });
+            recordToolCallOutcome(sessionState, {
+              toolName: normalizedToolName,
+              toolParams: outcome.params,
+              toolCallId,
+              error: err,
+            });
+          } catch (recordErr) {
+            log.warn(
+              `tool loop outcome tracking failed: tool=${normalizedToolName} error=${String(recordErr)}`,
+            );
+          }
+        }
+        throw err;
+      }
     },
   };
   Object.defineProperty(wrappedTool, BEFORE_TOOL_CALL_WRAPPED, {

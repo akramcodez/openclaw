@@ -13,6 +13,8 @@ export type SessionState = {
 export type ToolCallRecord = {
   toolName: string;
   argsHash: string;
+  toolCallId?: string;
+  resultHash?: string;
   timestamp: number;
 };
 
