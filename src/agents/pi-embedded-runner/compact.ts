@@ -651,6 +651,7 @@ export async function compactEmbeddedPiSessionDirect(
             attempts: maxAttempts,
             minDelayMs: retryDelayMs,
             maxDelayMs: retryDelayMs,
+            jitter: 0,
             shouldRetry: (err: unknown) => {
               log.warn(
                 `[compaction-retry] compaction failed (will retry): ${
