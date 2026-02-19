@@ -293,6 +293,16 @@ export type AgentCompactionConfig = {
   reserveTokensFloor?: number;
   /** Max share of context window for history during safeguard pruning (0.1–0.9, default 0.5). */
   maxHistoryShare?: number;
+  /**
+   * Maximum retry attempts for compaction summarization on transient failures.
+   * Default: 3
+   */
+  maxAttempts?: number;
+  /**
+   * Delay between retry attempts in milliseconds (fixed delay, no exponential backoff).
+   * Default: 1000
+   */
+  retryDelayMs?: number;
   /** Pre-compaction memory flush (agentic turn). Default: enabled. */
   memoryFlush?: AgentCompactionMemoryFlushConfig;
 };
