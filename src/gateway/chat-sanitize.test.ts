@@ -48,4 +48,26 @@ describe("stripEnvelopeFromMessage", () => {
     const result = stripEnvelopeFromMessage(input) as { content?: string };
     expect(result.content).toBe("Hello there");
   });
+
+  test("removes all inbound metadata blocks before user text", () => {
+    const input = {
+      role: "user",
+      content:
+        "Thread starter (untrusted, for context):\n```json\n{\"seed\": 1}\n```\n\nSender (untrusted metadata):\n```json\n{\"name\": \"alice\"}\n```\n\nActual user message",
+    };
+    const result = stripEnvelopeFromMessage(input) as { content?: string };
+    expect(result.content).toBe("Actual user message");
+  });
+
+  test("does not strip metadata-like blocks that are not a prefix", () => {
+    const input = {
+      role: "user",
+      content:
+        "Actual text\nConversation info (untrusted metadata):\n```json\n{\"message_id\": \"123\"}\n```\n\nFollow-up",
+    };
+    const result = stripEnvelopeFromMessage(input) as { content?: string };
+    expect(result.content).toBe(
+      "Actual text\nConversation info (untrusted metadata):\n```json\n{\"message_id\": \"123\"}\n```\n\nFollow-up",
+    );
+  });
 });

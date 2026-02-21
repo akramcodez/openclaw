@@ -1,4 +1,8 @@
-import { stripEnvelope, stripMessageIdHints } from "../shared/chat-envelope.js";
+import {
+  stripEnvelope,
+  stripInboundMetadataBlocks,
+  stripMessageIdHints,
+} from "../shared/chat-envelope.js";
 
 export { stripEnvelope };
 
@@ -25,15 +29,6 @@ function stripEnvelopeFromContent(content: unknown[]): { content: unknown[]; cha
   return { content: next, changed };
 }
 
-const INBOUND_META_BLOCK_RE = /Conversation info \(untrusted metadata\):\n```json[\s\S]*?```\n\n/g;
-
-export function stripInboundMeta(text: string): string {
-  if (!text.includes("Conversation info (untrusted metadata):")) {
-    return text;
-  }
-  return text.replace(INBOUND_META_BLOCK_RE, "");
-}
-
 export function stripEnvelopeFromMessage(message: unknown): unknown {
   if (!message || typeof message !== "object") {
     return message;
@@ -48,7 +43,9 @@ export function stripEnvelopeFromMessage(message: unknown): unknown {
   const next: Record<string, unknown> = { ...entry };
 
   if (typeof entry.content === "string") {
-    const stripped = stripMessageIdHints(stripEnvelope(stripInboundMeta(entry.content)));
+    const stripped = stripMessageIdHints(
+      stripEnvelope(stripInboundMetadataBlocks(entry.content)),
+    );
     if (stripped !== entry.content) {
       next.content = stripped;
       changed = true;
@@ -60,7 +57,9 @@ export function stripEnvelopeFromMessage(message: unknown): unknown {
       changed = true;
     }
   } else if (typeof entry.text === "string") {
-    const stripped = stripMessageIdHints(stripEnvelope(stripInboundMeta(entry.text)));
+    const stripped = stripMessageIdHints(
+      stripEnvelope(stripInboundMetadataBlocks(entry.text)),
+    );
     if (stripped !== entry.text) {
       next.text = stripped;
       changed = true;
