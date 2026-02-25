@@ -360,4 +360,82 @@ describe("web monitor inbox", () => {
 
     await listener.close();
   });
+
+  it("sends read receipts for allowed senders when sendReadReceipts: true with allowlist dmPolicy", async () => {
+    const { onMessage, listener, sock } = await startWebInboxMonitor({
+      config: {
+        channels: {
+          whatsapp: {
+            dmPolicy: "allowlist",
+            allowFrom: ["+222"],
+            sendReadReceipts: true,
+          },
+        },
+        messages: DEFAULT_MESSAGES_CFG,
+      },
+      sendReadReceipts: true,
+    });
+
+    sock.ev.emit(
+      "messages.upsert",
+      createNotifyUpsert(
+        createDmMessage({
+          id: "rr-allowlist-1",
+          remoteJid: "222@s.whatsapp.net",
+          conversation: "hello",
+        }),
+      ),
+    );
+    await flushInboundQueue();
+
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    expect(sock.readMessages).toHaveBeenCalledWith([
+      {
+        remoteJid: "222@s.whatsapp.net",
+        id: "rr-allowlist-1",
+        participant: undefined,
+        fromMe: false,
+      },
+    ]);
+
+    await listener.close();
+  });
+
+  it("explicit sendReadReceipts: true overrides isSelfChat heuristic (#19081)", async () => {
+    const { onMessage, listener, sock } = await startWebInboxMonitor({
+      config: {
+        channels: {
+          whatsapp: {
+            allowFrom: ["+123"],
+          },
+        },
+        messages: DEFAULT_MESSAGES_CFG,
+      },
+      sendReadReceipts: true,
+    });
+
+    sock.ev.emit(
+      "messages.upsert",
+      createNotifyUpsert(
+        createDmMessage({
+          id: "rr-selfchat-override-1",
+          remoteJid: "123@s.whatsapp.net",
+          conversation: "self-chat with explicit receipts",
+        }),
+      ),
+    );
+    await flushInboundQueue();
+
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    expect(sock.readMessages).toHaveBeenCalledWith([
+      {
+        remoteJid: "123@s.whatsapp.net",
+        id: "rr-selfchat-override-1",
+        participant: undefined,
+        fromMe: false,
+      },
+    ]);
+
+    await listener.close();
+  });
 });
