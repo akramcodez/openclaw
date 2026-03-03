@@ -16,7 +16,7 @@ function isOpenAINativeEndpoint(baseUrl: string): boolean {
     const host = new URL(baseUrl).hostname.toLowerCase();
     return host === "api.openai.com";
   } catch {
-    return baseUrl.toLowerCase().includes("api.openai.com");
+    return false;
   }
 }
 

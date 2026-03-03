@@ -211,6 +211,43 @@ describe("normalizeModelCompat", () => {
     ).toBe(false);
   });
 
+  it("leaves openai-completions model with empty baseUrl untouched", () => {
+    const model = {
+      ...baseModel(),
+      provider: "openai",
+    };
+    delete (model as { baseUrl?: unknown }).baseUrl;
+    delete (model as { compat?: unknown }).compat;
+    const normalized = normalizeModelCompat(model as Model<Api>);
+    expect(normalized.compat).toBeUndefined();
+  });
+
+  it("forces supportsDeveloperRole off for malformed baseUrl values", () => {
+    const model = {
+      ...baseModel(),
+      provider: "custom-cpa",
+      baseUrl: "://api.openai.com malformed",
+    };
+    delete (model as { compat?: unknown }).compat;
+    const normalized = normalizeModelCompat(model);
+    expect(
+      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
+    ).toBe(false);
+  });
+
+  it("overrides explicit supportsDeveloperRole true on non-native endpoints", () => {
+    const model = {
+      ...baseModel(),
+      provider: "custom-cpa",
+      baseUrl: "https://proxy.example.com/v1",
+      compat: { supportsDeveloperRole: true },
+    };
+    const normalized = normalizeModelCompat(model);
+    expect(
+      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
+    ).toBe(false);
+  });
+
   it("does not override explicit compat false", () => {
     const model = baseModel();
     model.compat = { supportsDeveloperRole: false };
