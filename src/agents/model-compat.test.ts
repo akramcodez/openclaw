@@ -19,6 +19,10 @@ const baseModel = (): Model<Api> =>
     maxTokens: 1024,
   }) as Model<Api>;
 
+function supportsDeveloperRole(model: Model<Api>): boolean | undefined {
+  return (model.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole;
+}
+
 function createTemplateModel(provider: string, id: string): Model<Api> {
   return {
     id,
@@ -105,9 +109,7 @@ describe("normalizeModelCompat", () => {
     const model = baseModel();
     delete (model as { compat?: unknown }).compat;
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
 
   it("forces supportsDeveloperRole off for moonshot models", () => {
@@ -118,9 +120,7 @@ describe("normalizeModelCompat", () => {
     };
     delete (model as { compat?: unknown }).compat;
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
 
   it("forces supportsDeveloperRole off for custom moonshot-compatible endpoints", () => {
@@ -131,9 +131,7 @@ describe("normalizeModelCompat", () => {
     };
     delete (model as { compat?: unknown }).compat;
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
 
   it("forces supportsDeveloperRole off for DashScope provider ids", () => {
@@ -144,9 +142,7 @@ describe("normalizeModelCompat", () => {
     };
     delete (model as { compat?: unknown }).compat;
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
 
   it("forces supportsDeveloperRole off for DashScope-compatible endpoints", () => {
@@ -157,9 +153,7 @@ describe("normalizeModelCompat", () => {
     };
     delete (model as { compat?: unknown }).compat;
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
 
   it("leaves native api.openai.com model untouched", () => {
@@ -181,9 +175,7 @@ describe("normalizeModelCompat", () => {
     };
     delete (model as { compat?: unknown }).compat;
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
   it("forces supportsDeveloperRole off for generic custom openai-completions provider", () => {
     const model = {
@@ -193,9 +185,7 @@ describe("normalizeModelCompat", () => {
     };
     delete (model as { compat?: unknown }).compat;
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
 
   it("forces supportsDeveloperRole off for Qwen proxy via openai-completions", () => {
@@ -230,9 +220,7 @@ describe("normalizeModelCompat", () => {
     };
     delete (model as { compat?: unknown }).compat;
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
 
   it("overrides explicit supportsDeveloperRole true on non-native endpoints", () => {
@@ -243,18 +231,27 @@ describe("normalizeModelCompat", () => {
       compat: { supportsDeveloperRole: true },
     };
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
+  });
+
+  it("does not mutate caller model when forcing supportsDeveloperRole off", () => {
+    const model = {
+      ...baseModel(),
+      provider: "custom-cpa",
+      baseUrl: "https://proxy.example.com/v1",
+    };
+    delete (model as { compat?: unknown }).compat;
+    const normalized = normalizeModelCompat(model);
+    expect(normalized).not.toBe(model);
+    expect(supportsDeveloperRole(model)).toBeUndefined();
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
 
   it("does not override explicit compat false", () => {
     const model = baseModel();
     model.compat = { supportsDeveloperRole: false };
     const normalized = normalizeModelCompat(model);
-    expect(
-      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
-    ).toBe(false);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
   });
 });
 
