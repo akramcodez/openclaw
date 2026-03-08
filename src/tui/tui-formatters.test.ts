@@ -225,6 +225,10 @@ describe("sanitizeRenderableText", () => {
     { label: "runaway dashes", input: "-".repeat(60) },
     { label: "runaway dots", input: ".".repeat(60) },
     { label: "runaway underscores", input: "_".repeat(60) },
+    {
+      label: "hyphenated prose",
+      input: "this-is-a-very-long-natural-language-fragment-that-wraps-poorly",
+    },
   ])("breaks $label unbroken tokens to protect narrow terminals", ({ input }) => {
     expectTokenWidthUnderLimit(input);
   });

@@ -78,8 +78,10 @@ function isCopySensitiveToken(token: string): boolean {
   if (candidate.includes("/") || candidate.includes("\\")) {
     return true;
   }
+  const hasDotOrUnderscore = candidate.includes("_") || candidate.includes(".");
+  const hasHyphenAndDigit = candidate.includes("-") && /\d/.test(candidate);
   if (
-    (candidate.includes("_") || candidate.includes(".") || candidate.includes("-")) &&
+    (hasDotOrUnderscore || hasHyphenAndDigit) &&
     FILE_LIKE_RE.test(candidate) &&
     /[a-zA-Z0-9]/.test(candidate)
   ) {
