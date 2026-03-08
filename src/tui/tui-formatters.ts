@@ -80,7 +80,8 @@ function isCopySensitiveToken(token: string): boolean {
   }
   if (
     (candidate.includes("_") || candidate.includes(".") || candidate.includes("-")) &&
-    FILE_LIKE_RE.test(candidate)
+    FILE_LIKE_RE.test(candidate) &&
+    /[a-zA-Z0-9]/.test(candidate)
   ) {
     return true;
   }

@@ -222,6 +222,9 @@ describe("sanitizeRenderableText", () => {
   it.each([
     { label: "very long", input: "a".repeat(140) },
     { label: "moderately long", input: "b".repeat(90) },
+    { label: "runaway dashes", input: "-".repeat(60) },
+    { label: "runaway dots", input: ".".repeat(60) },
+    { label: "runaway underscores", input: "_".repeat(60) },
   ])("breaks $label unbroken tokens to protect narrow terminals", ({ input }) => {
     expectTokenWidthUnderLimit(input);
   });
