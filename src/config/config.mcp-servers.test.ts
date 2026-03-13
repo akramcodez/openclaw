@@ -166,4 +166,25 @@ describe("mcp servers config schema", () => {
       res.error.issues.some((issue) => issue.message.toLowerCase().includes("unrecognized")),
     ).toBe(true);
   });
+
+  it("rejects empty strings in the args array", () => {
+    const res = OpenClawSchema.safeParse({
+      mcp: {
+        servers: {
+          bad_args: {
+            command: "/usr/bin/thing",
+            args: ["--flag", ""],
+          },
+        },
+      },
+    });
+
+    expect(res.success).toBe(false);
+    if (res.success) {
+      return;
+    }
+
+    const paths = res.error.issues.map((i) => i.path.join("."));
+    expect(paths.some((p) => p.includes("args"))).toBe(true);
+  });
 });
