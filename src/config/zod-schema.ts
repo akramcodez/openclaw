@@ -87,6 +87,21 @@ const MemoryQmdMcporterSchema = z
   })
   .strict();
 
+const McpServerEntrySchema = z
+  .object({
+    command: z.string().min(1),
+    args: z.array(z.string()).optional(),
+    description: z.string().optional(),
+  })
+  .strict();
+
+const McpSchema = z
+  .object({
+    servers: z.record(z.string().min(1), McpServerEntrySchema).optional(),
+  })
+  .strict()
+  .optional();
+
 const LoggingLevelSchema = z.union([
   z.literal("silent"),
   z.literal("fatal"),
@@ -892,6 +907,7 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    mcp: McpSchema,
   })
   .strict()
   .superRefine((cfg, ctx) => {
