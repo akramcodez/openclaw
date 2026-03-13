@@ -44,7 +44,7 @@ export type McpServerEntryConfig = {
 export type McpServerName = string & { readonly __brand: "McpServerName" };
 
 export type McpConfig = {
-  /** MCP servers keyed by an arbitrary user-defined server name. */
+  /** MCP servers keyed by a user-defined server name (must match /^[a-zA-Z0-9_-]+$/). */
   servers?: Record<McpServerName, McpServerEntryConfig>;
 };
 

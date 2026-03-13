@@ -112,7 +112,7 @@ describe("mcp servers config schema", () => {
     }
 
     const paths = res.error.issues.map((i) => i.path.join("."));
-    expect(paths.some((p) => p.includes("mcp"))).toBe(true);
+    expect(paths.some((p) => p.endsWith("command"))).toBe(true);
   });
 
   it("rejects an empty string command", () => {
