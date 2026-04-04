@@ -711,7 +711,7 @@ export class AcpSessionManager {
               })
             : null;
         if (taskContext) {
-          this.createBackgroundTaskRecord(taskContext, turnStartedAt);
+          this.createBackgroundTaskRecord(taskContext);
         }
         let taskProgressSummary = "";
         for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -1896,7 +1896,7 @@ export class AcpSessionManager {
     };
   }
 
-  private createBackgroundTaskRecord(context: BackgroundTaskContext, startedAt: number): void {
+  private createBackgroundTaskRecord(context: BackgroundTaskContext): void {
     try {
       createRunningTaskRun({
         runtime: "acp",
@@ -1908,7 +1908,6 @@ export class AcpSessionManager {
         runId: context.runId,
         label: context.label,
         task: context.task,
-        startedAt,
       });
     } catch (error) {
       logVerbose(

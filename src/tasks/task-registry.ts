@@ -1412,9 +1412,15 @@ export function createTaskRecord(params: {
   if (existing) {
     return mergeExistingTaskForCreate(existing, params);
   }
-  const now = Date.now();
+  const createdAt = Date.now();
   const taskId = crypto.randomUUID();
   const status = normalizeTaskStatus(params.status);
+  const startedAt =
+    params.startedAt !== undefined
+      ? Math.max(createdAt, params.startedAt)
+      : status === "running"
+        ? createdAt
+        : undefined;
   const deliveryStatus =
     params.deliveryStatus ??
     ensureDeliveryStatus({
@@ -1427,7 +1433,7 @@ export function createTaskRecord(params: {
     ownerKey,
     scopeKind,
   });
-  const lastEventAt = params.lastEventAt ?? params.startedAt ?? now;
+  const lastEventAt = params.lastEventAt ?? startedAt ?? createdAt;
   const record: TaskRecord = {
     taskId,
     runtime: params.runtime,
@@ -1445,8 +1451,8 @@ export function createTaskRecord(params: {
     status,
     deliveryStatus,
     notifyPolicy,
-    createdAt: now,
-    startedAt: params.startedAt,
+    createdAt,
+    startedAt,
     lastEventAt,
     cleanupAfter: params.cleanupAfter,
     progressSummary: normalizeTaskSummary(params.progressSummary),
@@ -1515,9 +1521,17 @@ function updateTaskStateByRunId(params: {
     const eventAt = params.lastEventAt ?? params.endedAt ?? Date.now();
     if (params.status) {
       patch.status = normalizeTaskStatus(params.status);
+      if (
+        patch.status === "running" &&
+        current.status !== "running" &&
+        current.startedAt == null &&
+        params.startedAt == null
+      ) {
+        patch.startedAt = eventAt;
+      }
     }
     if (params.startedAt != null) {
-      patch.startedAt = params.startedAt;
+      patch.startedAt = Math.max(current.createdAt, params.startedAt);
     }
     if (params.endedAt != null) {
       patch.endedAt = params.endedAt;

@@ -1075,7 +1075,6 @@ export async function spawnAcpDirect(
         task: params.task,
         preferMetadata: true,
         deliveryStatus: requesterInternalKey.trim() ? "pending" : "parent_missing",
-        startedAt: Date.now(),
       });
     } catch (error) {
       log.warn("Failed to create background task for ACP spawn", {
@@ -1107,7 +1106,6 @@ export async function spawnAcpDirect(
       task: params.task,
       preferMetadata: true,
       deliveryStatus: requesterInternalKey.trim() ? "pending" : "parent_missing",
-      startedAt: Date.now(),
     });
   } catch (error) {
     log.warn("Failed to create background task for ACP spawn", {
