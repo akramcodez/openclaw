@@ -1,14 +1,16 @@
 import { describe, expect, it, afterEach } from "vitest";
-import { createRunningTaskRun } from "../../tasks/task-executor.js";
-import { findTaskByRunId, resetTaskRegistryForTests } from "../../tasks/task-registry.js";
+import { createRunningTaskRun } from "./task-executor.js";
+import { findTaskByRunId, resetTaskRegistryForTests } from "./task-registry.js";
 
 describe("Cron Task Timestamp Invariants", () => {
+  const originalDateNow = globalThis.Date.now;
+
   afterEach(() => {
+    globalThis.Date.now = originalDateNow;
     resetTaskRegistryForTests();
   });
 
-  it("cron tasks explicitly passing startedAt automatically clamp startedAt >= createdAt", async () => {
-    const originalDateNow = globalThis.Date.now;
+  it("cron tasks explicitly passing startedAt automatically clamp startedAt >= createdAt", () => {
 
     const startOfTime = Date.parse("2026-03-23T12:00:00.000Z");
 
@@ -35,11 +37,9 @@ describe("Cron Task Timestamp Invariants", () => {
     expect(task!.startedAt).toBeGreaterThanOrEqual(task!.createdAt);
     expect(task!.startedAt).toBe(startOfTime + 5);
 
-    globalThis.Date.now = originalDateNow;
   });
 
-  it("default execution handlers implicitly receive startedAt identical to createdAt", async () => {
-    const originalDateNow = globalThis.Date.now;
+  it("default execution handlers implicitly receive startedAt identical to createdAt", () => {
 
     const startOfTime = Date.parse("2026-03-23T12:00:00.000Z");
     globalThis.Date.now = () => startOfTime;
@@ -63,6 +63,5 @@ describe("Cron Task Timestamp Invariants", () => {
     expect(task!.startedAt).toBeGreaterThanOrEqual(task!.createdAt);
     expect(task!.startedAt).toBe(startOfTime);
 
-    globalThis.Date.now = originalDateNow;
   });
 });

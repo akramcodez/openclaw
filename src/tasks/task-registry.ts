@@ -1204,9 +1204,13 @@ export function setTaskTimingById(params: {
   lastEventAt?: number;
 }): TaskRecord | null {
   ensureTaskRegistryReady();
+  const existing = getTaskById(params.taskId);
+  if (!existing) {
+    return null;
+  }
   const patch: Partial<TaskRecord> = {};
   if (params.startedAt != null) {
-    patch.startedAt = params.startedAt;
+    patch.startedAt = Math.max(existing.createdAt, params.startedAt);
   }
   if (params.endedAt != null) {
     patch.endedAt = params.endedAt;
