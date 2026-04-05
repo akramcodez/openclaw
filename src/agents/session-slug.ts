@@ -1,5 +1,8 @@
 import { generateSecureInt } from "../infra/secure-random.js";
 
+/** Default timeout in ms for the slug-gen embedded LLM run. */
+export const DEFAULT_SLUG_TIMEOUT_MS = 15_000;
+
 const SLUG_ADJECTIVES = [
   "amber",
   "briny",

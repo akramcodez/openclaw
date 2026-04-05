@@ -217,6 +217,8 @@ export type AgentDefaultsConfig = {
   /** Human-like delay between block replies. */
   humanDelay?: HumanDelayConfig;
   timeoutSeconds?: number;
+  /** Timeout in ms for the slug-gen embedded LLM run that names sessions (default: 15000, max: 300000). */
+  slugTimeoutMs?: number;
   /** Max inbound media size in MB for agent-visible attachments (text note or future image attach). */
   mediaMaxMb?: number;
   /**

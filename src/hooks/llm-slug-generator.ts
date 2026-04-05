@@ -14,6 +14,7 @@ import {
 import { DEFAULT_PROVIDER, DEFAULT_MODEL } from "../agents/defaults.js";
 import { parseModelRef } from "../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
+import { DEFAULT_SLUG_TIMEOUT_MS } from "../agents/session-slug.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 
@@ -61,7 +62,7 @@ Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", 
       prompt,
       provider,
       model,
-      timeoutMs: 15_000, // 15 second timeout
+      timeoutMs: params.cfg?.agents?.defaults?.slugTimeoutMs ?? DEFAULT_SLUG_TIMEOUT_MS,
       runId: `slug-gen-${Date.now()}`,
     });
 

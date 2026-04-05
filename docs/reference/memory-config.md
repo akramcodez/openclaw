@@ -368,3 +368,35 @@ Default is DM-only. `match.keyPrefix` matches the normalized session key;
   },
 }
 ```
+
+---
+
+## Session title generation timeout
+
+When a session ends via `/new` or `/reset`, OpenClaw runs a short embedded
+LLM call to generate a descriptive 1–2 word title for the session memory file.
+This run has a configurable timeout:
+
+| Key                             | Type           | Default | Max      |
+| ------------------------------- | -------------- | ------- | -------- |
+| `agents.defaults.slugTimeoutMs` | `integer` (ms) | `15000` | `300000` |
+
+If the LLM doesn't respond in time you'll see a log line like:
+
+```
+[agent/embedded] embedded run timeout: runId=slug-gen-… timeoutMs=15000
+```
+
+The session is still saved; it just gets a timestamp-based filename instead
+of a descriptive one. Raise `slugTimeoutMs` if you use a slow or heavily-loaded
+LLM provider:
+
+```json5
+{
+  agents: {
+    defaults: {
+      slugTimeoutMs: 60000,
+    },
+  },
+}
+```

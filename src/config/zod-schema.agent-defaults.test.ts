@@ -11,4 +11,17 @@ describe("agent defaults schema", () => {
       }),
     ).not.toThrow();
   });
+
+  it("accepts a valid slugTimeoutMs", () => {
+    expect(() => AgentDefaultsSchema.parse({ slugTimeoutMs: 60_000 })).not.toThrow();
+  });
+
+  it("rejects slugTimeoutMs of zero or negative", () => {
+    expect(() => AgentDefaultsSchema.parse({ slugTimeoutMs: 0 })).toThrow();
+    expect(() => AgentDefaultsSchema.parse({ slugTimeoutMs: -1 })).toThrow();
+  });
+
+  it("rejects slugTimeoutMs above 300000", () => {
+    expect(() => AgentDefaultsSchema.parse({ slugTimeoutMs: 300_001 })).toThrow();
+  });
 });

@@ -176,6 +176,15 @@ export const AgentDefaultsSchema = z
     blockStreamingCoalesce: BlockStreamingCoalesceSchema.optional(),
     humanDelay: HumanDelaySchema.optional(),
     timeoutSeconds: z.number().int().positive().optional(),
+    slugTimeoutMs: z
+      .number()
+      .int()
+      .positive()
+      .max(300_000)
+      .optional()
+      .describe(
+        "Timeout in ms for the slug-gen session-title generation run. Default: 15000, max: 300000.",
+      ),
     mediaMaxMb: z.number().positive().optional(),
     imageMaxDimensionPx: z.number().int().positive().optional(),
     typingIntervalSeconds: z.number().int().positive().optional(),
